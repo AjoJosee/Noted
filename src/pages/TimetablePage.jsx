@@ -1,155 +1,172 @@
-import { useEffect, useState } from "react";
+import React, { useMemo, useState } from 'react';
 
-import EditableCell from "../components/EditableCell";
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-import {
-    loadSubjects,
-    loadTimetable,
-    saveTimetable,
-} from "../utils/storage";
+const createEmptyTimetable = () =>
+  days.map((day) => ({
+    day,
+    periods: Array(5).fill('')
+  }));
 
-const DAYS = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-];
+const TimetablePage = () => {
+  const [timetable, setTimetable] = useState(createEmptyTimetable());
+  const [hoveredCell, setHoveredCell] = useState(null);
 
-const PERIOD_TIMES = [
-    "09-10",
-    "10-11",
-    "11-12",
-    "13-14",
-    "14-15",
-    "15-16",
-];
+  const handleCellClick = (dayIndex, periodIndex) => {
+    const currentValue = timetable[dayIndex].periods[periodIndex];
+    const nextValue = window.prompt('Enter subject name', currentValue || '');
 
-export default function TimetablePage() {
-    const [subjects] = useState(loadSubjects());
+    if (nextValue === null) return;
 
-    const [timetable, setTimetable] =
-        useState(loadTimetable());
-
-    const [saved, setSaved] = useState(false);
-
-    useEffect(() => {
-        saveTimetable(timetable);
-    }, [timetable]);
-
-    function updatePeriod(day, period, subjectId) {
-        setTimetable((previous) => ({
-            ...previous,
-            [day]: previous[day].map(
-                (oldValue, index) =>
-                    index === period
-                        ? subjectId
-                        : oldValue
-            ),
-        }));
-
-        setSaved(false);
-    }
-
-    function handleSave() {
-        saveTimetable(timetable);
-
-        setSaved(true);
-
-        setTimeout(() => {
-            setSaved(false);
-        }, 2000);
-    }
-
-    return (
-        <div className="p-6">
-            <h1 className="mb-5 text-3xl font-bold">
-                Weekly Timetable
-            </h1>
-
-            <div className="w-full">
-                <table className="w-full table-fixed border-collapse border text-center">
-                    <thead>
-                        <tr>
-                            <th className="w-24 border p-2 text-sm">
-                                Day
-                            </th>
-
-                            {PERIOD_TIMES.map(
-                                (time, index) => (
-                                    <th
-                                        key={time}
-                                        className="border p-2 text-xs"
-                                    >
-                                        <div className="font-bold">
-                                            P{index + 1}
-                                        </div>
-
-                                        <div className="text-gray-500">
-                                            {time}
-                                        </div>
-                                    </th>
-                                )
-                            )}
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {DAYS.map((day) => (
-                            <tr key={day}>
-                                <td className="border p-2 text-sm font-semibold">
-                                    {day}
-                                </td>
-
-                                {timetable[day].map(
-                                    (
-                                        subjectId,
-                                        period
-                                    ) => (
-                                        <td
-                                            key={period}
-                                            className="h-12 border p-1"
-                                        >
-                                            <EditableCell
-                                                value={
-                                                    subjectId
-                                                }
-                                                subjects={
-                                                    subjects
-                                                }
-                                                onChange={(
-                                                    value
-                                                ) =>
-                                                    updatePeriod(
-                                                        day,
-                                                        period,
-                                                        value
-                                                    )
-                                                }
-                                            />
-                                        </td>
-                                    )
-                                )}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            <div className="mt-6 flex flex-col items-center gap-3">
-                <button
-                    onClick={handleSave}
-                    className="rounded bg-blue-600 px-6 py-2 text-white"
-                >
-                    Save Timetable
-                </button>
-
-                {saved && (
-                    <p className="text-sm text-green-600">
-                        Timetable saved successfully.
-                    </p>
-                )}
-            </div>
-        </div>
+    setTimetable((prev) =>
+      prev.map((row, rowIndex) =>
+        rowIndex === dayIndex
+          ? {
+              ...row,
+              periods: row.periods.map((cell, cellIndex) =>
+                cellIndex === periodIndex ? nextValue.trim() : cell
+              )
+            }
+          : row
+      )
     );
-}
+  };
+
+  const summary = useMemo(() => {
+    const filled = timetable.flatMap((row) => row.periods.filter(Boolean)).length;
+    return { filled, total: timetable.length * 5 };
+  }, [timetable]);
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.header}>
+        <div>
+          <h2 style={styles.title}>Weekly timetable</h2>
+          <p style={styles.subtitle}>Click any cell to add or edit a subject.</p>
+        </div>
+        <div style={styles.summaryBox}>
+          {summary.filled} of {summary.total} cells filled
+        </div>
+      </div>
+
+      <div style={styles.table}>
+        <div style={styles.rowHeader}>
+          <div style={styles.cornerCell}>Day</div>
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} style={styles.periodHeader}>
+              Period {i + 1}
+            </div>
+          ))}
+        </div>
+
+        {timetable.map((row, dayIndex) => (
+          <div key={row.day} style={styles.row}>
+            <div style={styles.dayLabel}>{row.day}</div>
+            {row.periods.map((cell, periodIndex) => {
+              const key = `${dayIndex}-${periodIndex}`;
+              const isHovered = hoveredCell === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleCellClick(dayIndex, periodIndex)}
+                  onMouseEnter={() => setHoveredCell(key)}
+                  onMouseLeave={() => setHoveredCell(null)}
+                  style={{
+                    ...styles.cell,
+                    backgroundColor: isHovered ? '#f8fafc' : '#ffffff',
+                    borderColor: isHovered ? '#cbd5e1' : '#e2e8f0'
+                  }}
+                >
+                  {cell || 'Add subject'}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const styles = {
+  page: {
+    padding: 24,
+    background: '#f8fafc',
+    minHeight: '100vh'
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  title: {
+    margin: 0,
+    fontSize: 24,
+    color: '#0f172a'
+  },
+  subtitle: {
+    margin: '6px 0 0',
+    color: '#64748b'
+  },
+  summaryBox: {
+    background: '#ffffff',
+    border: '1px solid #e2e8f0',
+    borderRadius: 999,
+    padding: '8px 12px',
+    color: '#334155',
+    fontWeight: 600
+  },
+  table: {
+    background: '#ffffff',
+    borderRadius: 16,
+    border: '1px solid #e2e8f0',
+    overflow: 'hidden'
+  },
+  rowHeader: {
+    display: 'grid',
+    gridTemplateColumns: '140px repeat(5, minmax(120px, 1fr))',
+    background: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  cornerCell: {
+    padding: '12px 14px',
+    fontWeight: 700,
+    color: '#0f172a',
+    borderRight: '1px solid #e2e8f0'
+  },
+  periodHeader: {
+    padding: '12px 14px',
+    fontWeight: 700,
+    color: '#334155',
+    borderRight: '1px solid #e2e8f0',
+    textAlign: 'center'
+  },
+  row: {
+    display: 'grid',
+    gridTemplateColumns: '140px repeat(5, minmax(120px, 1fr))',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  dayLabel: {
+    padding: '12px 14px',
+    fontWeight: 600,
+    color: '#0f172a',
+    borderRight: '1px solid #e2e8f0',
+    background: '#fcfdff'
+  },
+  cell: {
+    padding: '12px 10px',
+    border: '1px solid #e2e8f0',
+    borderTop: 'none',
+    borderLeft: 'none',
+    background: '#ffffff',
+    color: '#334155',
+    cursor: 'pointer',
+    textAlign: 'center',
+    minHeight: 50,
+    transition: 'background-color 0.2s ease'
+  }
+};
+
+export default TimetablePage;
